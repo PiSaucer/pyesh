@@ -23,7 +23,16 @@ pyesh is its own shell language rather than a Bash interpreter. Explicit `.sh` a
 
 ## Install and run
 
-Requires Python 3.9 or newer:
+Requires Python 3.9 or newer.
+
+Install with Homebrew on macOS or Linux:
+
+```bash
+brew tap PiSaucer/homebrew-tap
+brew install PiSaucer/tap/pyesh
+```
+
+Or install from the Python package source:
 
 ```bash
 python -m pip install -e .
