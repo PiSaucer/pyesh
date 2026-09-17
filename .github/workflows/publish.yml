@@ -1,0 +1,128 @@
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Build and publish
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Check out the release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate release version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python - <<'PYTHON'
+          import ast
+          import os
+          import re
+          from pathlib import Path
+
+          tag = os.environ["TAG"]
+          if re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag) is None:
+              raise SystemExit("Release tag must use the vMAJOR.MINOR.PATCH format.")
+          source = ast.parse(Path("src/pyesh/__init__.py").read_text(encoding="utf-8"))
+          version = next(
+              ast.literal_eval(node.value)
+              for node in source.body
+              if isinstance(node, ast.Assign)
+              and any(
+                  isinstance(target, ast.Name) and target.id == "__version__"
+                  for target in node.targets
+              )
+          )
+          if tag != "v" + version:
+              raise SystemExit(
+                  "Tag version {0} does not match pyesh version {1}.".format(
+                      tag[1:], version
+                  )
+              )
+          print("Release tag matches pyesh version " + version)
+          PYTHON
+
+      - name: Build distributions
+        run: |
+          python -m pip install --upgrade build twine
+          python -m build
+          python -m twine check dist/*
+
+      - name: Add distributions to GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/*.whl dist/*.tar.gz --clobber
+
+      - name: Publish distributions
+        uses: pypa/gh-action-pypi-publish@release/v1
+
+  windows-executable:
+    name: Build Windows executable
+    needs: publish
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out the release
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Validate release version
+        shell: pwsh
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if ($env:TAG -notmatch '^v(\d+\.\d+\.\d+)$') {
+            throw 'Release tag must use the vMAJOR.MINOR.PATCH format.'
+          }
+          $tagVersion = $Matches[1]
+          $versionMatch = [regex]::Match(
+            (Get-Content -Raw -LiteralPath src/pyesh/__init__.py),
+            '(?m)^__version__\s*=\s*"(\d+\.\d+\.\d+)"\s*$'
+          )
+          if (-not $versionMatch.Success) {
+            throw 'Could not read __version__ from src/pyesh/__init__.py.'
+          }
+          $sourceVersion = $versionMatch.Groups[1].Value
+          if ($sourceVersion -ne $tagVersion) {
+            throw "Tag version $tagVersion does not match pyesh version $sourceVersion."
+          }
+
+      - name: Build executable
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade ".[windows-executable]"
+          pyinstaller --clean packaging/pyinstaller/pyesh-windows.spec
+          .\dist\pyesh-windows-x64.exe --version
+
+      - name: Add executable to GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload $env:TAG dist/pyesh-windows-x64.exe --clobber

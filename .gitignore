@@ -31,25 +31,14 @@ MANIFEST
 #   before PyInstaller builds the exe, so as to inject date/other infos into it.
 *.manifest
 *.spec
+!packaging/pyinstaller/pyesh-windows.spec
 
 # Installer logs
 pip-log.txt
 pip-delete-this-directory.txt
 
-# Unit test / coverage reports
-htmlcov/
-.tox/
-.nox/
-.coverage
-.coverage.*
+# Caches
 .cache
-nosetests.xml
-coverage.xml
-*.cover
-*.py.cover
-.hypothesis/
-.pytest_cache/
-cover/
 
 # Translations
 *.mo
@@ -202,6 +191,16 @@ cython_debug/
 # .vscode/
 # Temporary file for partial code execution
 tempCodeRunnerFile.py
+
+# Operating-system and pyesh local state
+.DS_Store
+.pyesh_history
+.pyeshenv
+.pyesh_paths
+.pyesh_profile
+.pyeshrc
+.pyesh_plugins
+pyesh.ini
 
 # Ruff stuff:
 .ruff_cache/
