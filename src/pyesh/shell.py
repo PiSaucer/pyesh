@@ -26,7 +26,15 @@ from .execution import run_pipeline, run_pipeline_captured
 from .help import TOPICS
 from .history import CommandHistory
 from .jobs import JobTable
-from .parsing import Command, Segment, ShellWord, expand_arguments, parse_command_line
+from .parsing import (
+    Command,
+    Segment,
+    ShellWord,
+    collapse_line_continuations,
+    expand_arguments,
+    parse_command_line,
+    shell_input_incomplete,
+)
 from .plugins import CORE_COMMANDS, PluginManager
 from .prompt import build_prompt
 from .python_runtime import NativePythonSession
@@ -686,13 +694,19 @@ def _append_python_continuation(source: str, continuation: str) -> str:
         continuation = indentation + "    " + continuation
     return source + "\n" + continuation
 
-def execute_script(source: str, state: SessionState, filename: str = "<string>") -> int:
+def execute_script(
+    source: str,
+    state: SessionState,
+    filename: str = "<string>",
+    record_history: bool = False,
+) -> int:
     """Execute pyesh source, collecting Python compound statements.
 
     Args:
         source: Complete native script text.
         state: Active shell session.
         filename: Diagnostic source name.
+        record_history: Add each executable command or Python block to history.
 
     Returns:
         Final command or explicit exit status.
@@ -702,6 +716,10 @@ def execute_script(source: str, state: SessionState, filename: str = "<string>")
     while index < len(lines):
         line = lines[index]
         index += 1
+        while shell_input_incomplete(line) and index < len(lines):
+            line += "\n" + lines[index]
+            index += 1
+        line = collapse_line_continuations(line)
         if not line.strip() or line.lstrip().startswith("#"):
             continue
         block = line
@@ -730,7 +748,7 @@ def execute_script(source: str, state: SessionState, filename: str = "<string>")
         if python_input_incomplete(block):
             raise ValueError("{0}:{1}: incomplete Python block".format(filename, index))
         try:
-            status = execute_command_line(block, state=state, record_history=False)
+            status = execute_command_line(block, state=state, record_history=record_history)
         except ValueError as error:
             raise ValueError("{0}:{1}: {2}".format(filename, index, error)) from error
         if state.exit_requested:
@@ -1035,6 +1053,9 @@ def run_shell(
                     if prompt_session.completer is not None:
                         prompt_session.completer._cwd = state.cwd
                 command = (prompt_session.prompt(formatted_prompt(plain_prompt)) if prompt_session is not None else input_fn(plain_prompt))
+                while shell_input_incomplete(command):
+                    continuation = prompt_session.prompt("... ") if prompt_session is not None else input_fn("... ")
+                    command += "\n" + continuation
                 while python_input_incomplete(command):
                     continuation = prompt_session.prompt("... ") if prompt_session is not None else input_fn("... ")
                     command = _append_python_continuation(command, continuation)
@@ -1063,7 +1084,10 @@ def run_shell(
                 continue
 
             try:
-                status = execute_command_line(command, state=state)
+                if "\n" in command or "\r" in command:
+                    status = execute_script(command, state, "<paste>", record_history=True)
+                else:
+                    status = execute_command_line(command, state=state)
             except ValueError as error:
                 print_error("pyesh: parse error: {0}".format(error))
                 status = 2

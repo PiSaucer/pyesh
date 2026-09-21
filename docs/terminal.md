@@ -6,6 +6,8 @@ The interactive shell colors input as it is typed. Commands and built-ins, opera
 
 Set the conventional `NO_COLOR` environment variable to disable input and output colors. Arrow-key history and Tab completion are provided by the same cross-platform editor on Windows, macOS, and Linux.
 
+Pasting multiple newline-delimited commands executes them in order as separate commands. A trailing backslash joins the next physical line, whether entered at the continuation prompt or pasted as a block. Multiline Python compound statements and heredocs remain grouped as single logical inputs.
+
 Named JSON profiles can independently enable or disable colors, syntax highlighting, completion, completion while typing, and mouse support. They can also set every input token style. See [Configuration and user files](configuration.md#json-profiles).
 
 ## Line editing and completion

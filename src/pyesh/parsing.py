@@ -46,6 +46,51 @@ class _Operator(str):
 
 _OPERATORS = ("2>&1", "1>&2", "0>&-", "1>&-", "2>&-", "2>>", "2>", "&>", "&&", "||", ">>", "<<-", "<<", "|", "&", ";", "<", ">")
 
+def collapse_line_continuations(source: str) -> str:
+    """Remove unquoted backslash-newline pairs from shell source."""
+    result: List[str] = []
+    quote = ""
+    comment = False
+    index = 0
+    while index < len(source):
+        char = source[index]
+        if char in "\r\n":
+            result.append(char)
+            comment = False
+            index += 1
+            continue
+        if comment:
+            result.append(char)
+            index += 1
+            continue
+        if char == "\\" and quote != "single":
+            newline = "\r\n" if source.startswith("\r\n", index + 1) else "\n"
+            if source.startswith(newline, index + 1):
+                index += 1 + len(newline)
+                continue
+            result.append(char)
+            if index + 1 < len(source):
+                result.append(source[index + 1])
+                index += 2
+            else:
+                index += 1
+            continue
+        if quote:
+            delimiter = "'" if quote == "single" else '"'
+            if char == delimiter:
+                quote = ""
+        elif char in ("'", '"'):
+            quote = "single" if char == "'" else "double"
+        elif char == "#" and (not result or result[-1].isspace()):
+            comment = True
+        result.append(char)
+        index += 1
+    return "".join(result)
+
+def shell_input_incomplete(source: str) -> bool:
+    """Return whether shell source ends with an active continuation slash."""
+    return source.endswith("\\") and collapse_line_continuations(source + "\n") == collapse_line_continuations(source[:-1])
+
 def _substitution_end(source: str, start: int) -> int:
     """Find the closing parenthesis for a command substitution.
 
@@ -85,6 +130,7 @@ def _tokens(command_line: str, posix: Optional[bool] = None) -> List[str]:
     Returns:
         Shell words and operator tokens in lexical order.
     """
+    command_line = collapse_line_continuations(command_line)
     windows = os.name == "nt" if posix is None else not posix
     tokens: List[str] = []
     segments: List[Segment] = []
