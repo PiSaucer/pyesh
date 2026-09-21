@@ -126,3 +126,84 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ github.event.release.tag_name }}
         run: gh release upload $env:TAG dist/pyesh-windows-x64.exe --clobber
+
+  update-homebrew-tap:
+    name: Update Homebrew tap
+    needs: publish
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Validate and download release
+        id: release
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Release tag must use the vMAJOR.MINOR.PATCH format." >&2
+            exit 1
+          fi
+
+          version="${TAG#v}"
+          archive="https://github.com/PiSaucer/pyesh/archive/refs/tags/${TAG}.tar.gz"
+
+          curl --fail --location --retry 5 --retry-all-errors \
+            --output pyesh.tar.gz \
+            "$archive"
+
+          version_path="$(
+            tar -tzf pyesh.tar.gz |
+              awk -F/ 'NF == 4 && $2 == "src" && $3 == "pyesh" && $4 == "__init__.py" { print; exit }'
+          )"
+          if [ -z "$version_path" ]; then
+            echo "Release archive does not contain src/pyesh/__init__.py." >&2
+            exit 1
+          fi
+          archive_version="$(
+            tar -xOf pyesh.tar.gz "$version_path" |
+              sed -n 's/^__version__ = "\([^"]*\)"$/\1/p'
+          )"
+          if [ "$archive_version" != "$version" ]; then
+            echo "Tag version ${version} does not match pyesh version ${archive_version}." >&2
+            exit 1
+          fi
+
+          sha256="$(sha256sum pyesh.tar.gz | cut -d ' ' -f 1)"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "sha256=$sha256" >> "$GITHUB_OUTPUT"
+
+      - name: Check out Homebrew tap
+        uses: actions/checkout@v4
+        with:
+          repository: PiSaucer/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update formula
+        working-directory: homebrew-tap
+        env:
+          ARCHIVE: ${{ steps.release.outputs.archive }}
+          SHA256: ${{ steps.release.outputs.sha256 }}
+          VERSION: ${{ steps.release.outputs.version }}
+        run: |
+          ruby -e '
+            path = "Formula/pyesh.rb"
+            formula = File.read(path)
+            url_changed = formula.sub!(/^\s*url ".*"$/, %(  url "#{ENV.fetch("ARCHIVE")}"))
+            sha_changed = formula.sub!(/^\s*sha256 ".*"$/, %(  sha256 "#{ENV.fetch("SHA256")}"))
+            abort "Formula is missing its url declaration" unless url_changed
+            abort "Formula is missing its sha256 declaration" unless sha_changed
+            File.write(path, formula)
+          '
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/pyesh.rb
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "Formula already matches pyesh ${VERSION}."
+            exit 0
+          fi
+          git commit -m "pyesh ${VERSION}"
+          git push
