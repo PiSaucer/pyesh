@@ -10,7 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 DEFAULT_PROMPT_TEMPLATE = (
-    "{platform_icon} {venv_segment}{user}@{host} "
+    "{platform_segment}{venv_segment}{user}@{host} "
     "{folder}{branch_segment} % "
 )
 
@@ -19,7 +19,7 @@ PLATFORM_ICONS = {
     "linux": "🐧",
     "steamos": "",
     "ubuntu": "",
-    "win32": "",
+    "win32": "",
 }
 
 @lru_cache(maxsize=1)
@@ -101,7 +101,8 @@ def build_prompt(
             working directory.
         template: Optional format string. Supported fields are ``user``,
             ``host``, ``folder``, ``path``, ``branch``, ``branch_segment``,
-            ``status``, ``venv``, ``venv_segment``, and ``platform_icon``.
+            ``status``, ``venv``, ``venv_segment``, ``platform_icon``, and
+            ``platform_segment``.
         status: Exit status of the previously executed command.
         environment: Optional environment mapping. Defaults to None.
 
@@ -114,6 +115,7 @@ def build_prompt(
     user = getpass.getuser()
     machine = socket.gethostname().split(".", 1)[0]
     branch = git_branch(current)
+    icon = platform_icon()
     values = {
         "user": user,
         "host": machine,
@@ -122,7 +124,8 @@ def build_prompt(
         "branch": branch or "",
         "branch_segment": " ({0})".format(branch) if branch else "",
         "status": status,
-        "platform_icon": platform_icon(),
+        "platform_icon": icon,
+        "platform_segment": "{0} ".format(icon) if icon else "",
         "venv": Path(active_environment["VIRTUAL_ENV"]).name
         if active_environment.get("VIRTUAL_ENV")
         else "",

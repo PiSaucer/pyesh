@@ -161,8 +161,12 @@ def _tokens(command_line: str, posix: Optional[bool] = None) -> List[str]:
         char = command_line[index]
         if char == "\\" and quote != "single":
             if index + 1 >= len(command_line):
+                if windows:
+                    text += "\\"
+                    index += 1
+                    continue
                 raise ValueError("trailing escape")
-            if windows and command_line[index + 1] not in " \\t\r\n'\"$#|&;<>":
+            if windows and command_line[index + 1] not in " \t\r\n'\"$#|&;<>":
                 text += "\\"; index += 1; continue
             segment()
             segments.append(Segment(command_line[index + 1], "single"))

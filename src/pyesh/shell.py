@@ -11,7 +11,7 @@ import sys
 from typing import Callable, List, Optional, Tuple
 
 from . import __version__
-from .backends import active_virtual_environment, virtual_environment_scripts
+from .backends import active_virtual_environment, is_explicit_path, virtual_environment_scripts
 from .builtins import describe_commands, run_builtin
 from .config import ShellConfig
 from .console import (
@@ -831,6 +831,35 @@ def _command_substitute(source: str, state: SessionState) -> str:
     except UnicodeDecodeError as error:
         raise ValueError("command substitution output is not UTF-8") from error
 
+def _looks_like_shell_command(command_line: str, state: SessionState) -> bool:
+    """Return true when input should bypass native Python dispatch."""
+    first_word = command_line.lstrip().split(None, 1)[0] if command_line.strip() else ""
+    if (
+        first_word in CORE_COMMANDS
+        or first_word in state.aliases
+        or first_word in state.plugins.command_names()
+    ):
+        return True
+    try:
+        jobs = parse_command_line(command_line)
+    except ValueError:
+        return False
+    if (
+        len(jobs) == 1
+        and len(jobs[0].commands) == 1
+        and jobs[0].commands[0].arguments
+    ):
+        command = jobs[0].commands[0]
+        if (
+            command.input_path is not None
+            or command.output_path is not None
+            or command.redirections
+        ):
+            return True
+        first_argument = str(jobs[0].commands[0].arguments[0])
+        return is_explicit_path(first_argument)
+    return len(jobs) > 1 or any(len(job.commands) > 1 or job.background for job in jobs)
+
 def _builtin_child_arguments() -> List[str]:
     """Return the child-process prefix for pipeline-safe built-ins."""
     if getattr(sys, "frozen", False):
@@ -859,9 +888,7 @@ def _execute_command_line(command_line: str, state: Optional[SessionState] = Non
             print_python_trace(command_line)
         return assignment_status
     command_line = _rewrite_python_capture(command_line)
-    first_word = command_line.lstrip().split(None, 1)[0] if command_line.strip() else ""
-    shell_command = (first_word in CORE_COMMANDS or first_word in session.aliases
-                     or first_word in session.plugins.command_names())
+    shell_command = _looks_like_shell_command(command_line, session)
     if not shell_command and session.python.should_execute(command_line):
         if session.verbose:
             print_python_trace(command_line)

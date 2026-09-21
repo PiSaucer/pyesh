@@ -233,13 +233,19 @@ def _path_candidates(prefix: str, cwd: Optional[Path] = None) -> List[str]:
     Returns:
         Sorted matching paths. Directory results end in the platform separator.
     """
-    expanded = Path(prefix).expanduser()
-    parent = expanded.parent if prefix else Path(".")
+    quote = prefix[:1] if prefix.startswith(("'", '"')) else ""
+    path_prefix = prefix[1:] if quote else prefix
+    closing_quote = quote if quote and path_prefix.endswith(quote) else ""
+    if closing_quote:
+        path_prefix = path_prefix[:-1]
+
+    expanded = Path(path_prefix).expanduser()
+    parent = expanded.parent if path_prefix else Path(".")
     if not parent.is_absolute():
         parent = (cwd or Path.cwd()) / parent
-    name_prefix = expanded.name if prefix else ""
+    name_prefix = expanded.name if path_prefix else ""
     try:
-        entries = parent.iterdir()
+        entries = list(parent.iterdir())
     except OSError:
         return []
 
@@ -251,20 +257,20 @@ def _path_candidates(prefix: str, cwd: Optional[Path] = None) -> List[str]:
         # Retain the spelling of the parent that the user entered. pathlib
         # normalizes away a leading "./", which is meaningful when completing
         # a command path, so construct the displayed prefix deliberately.
-        if prefix.startswith("./"):
-            typed_parent = os.path.dirname(prefix)
+        if path_prefix.startswith("./"):
+            typed_parent = os.path.dirname(path_prefix)
             displayed = "./{0}".format(entry.name) if typed_parent == "." else os.path.join(typed_parent, entry.name)
-        elif prefix.startswith("~/"):
-            typed_parent = os.path.dirname(prefix)
+        elif path_prefix.startswith("~/"):
+            typed_parent = os.path.dirname(path_prefix)
             displayed = os.path.join(typed_parent, entry.name)
-        elif prefix:
-            typed_parent = os.path.dirname(prefix)
+        elif path_prefix:
+            typed_parent = os.path.dirname(path_prefix)
             displayed = (os.path.join(typed_parent, entry.name) if typed_parent else entry.name)
         else:
             displayed = entry.name
         if entry.is_dir():
             displayed += os.sep
-        candidates.append(displayed)
+        candidates.append(quote + displayed + closing_quote)
     return sorted(candidates)
 
 def _local_command_candidates(prefix: str, cwd: Optional[Path] = None) -> List[str]:

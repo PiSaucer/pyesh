@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * Execute newline-delimited commands pasted at the interactive prompt separately instead of combining them into one process invocation.
 * Accept backslash-newline shell continuations entered interactively or pasted as a multiline command.
+* Windows command parsing now preserves backslashes in explicit executable paths and accepts a trailing path separator.
+* Quoted Windows executable paths containing spaces now launch as shell commands instead of being evaluated as Python strings.
+* Path completion now handles quoted Windows paths without crashing on malformed or inaccessible directory names.
+* The default Windows prompt no longer reserves space for an unsupported platform icon.
 
 ## [1.0.0] - 2026-09-17
 

@@ -131,12 +131,13 @@ The first active line in `.pyesh_prompt` is formatted for every prompt. Fields:
 | `{status}`         | Previous command status                                |
 | `{venv}`           | Active `VIRTUAL_ENV` directory name, or empty          |
 | `{venv_segment}`   | Parenthesized venv name plus trailing space, or empty  |
-| `{platform_icon}`  | Platform icon (`` macOS, `🐧` Linux, `` Ubuntu, `` SteamOS, `` Windows) |
+| `{platform_icon}`  | Platform icon (`` macOS, `🐧` Linux, `` Ubuntu, `` SteamOS, empty on Windows) |
+| `{platform_segment}` | Platform icon plus trailing space, or empty on Windows |
 
 Default:
 
 ```plaintext
-{platform_icon} {venv_segment}{user}@{host} {folder}{branch_segment} %
+{platform_segment}{venv_segment}{user}@{host} {folder}{branch_segment} %
 ```
 
 Custom example:
