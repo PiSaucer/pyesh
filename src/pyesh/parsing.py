@@ -89,6 +89,10 @@ def collapse_line_continuations(source: str) -> str:
 
 def shell_input_incomplete(source: str) -> bool:
     """Return whether shell source ends with an active continuation slash."""
+    if os.name == "nt" and source.endswith("\\"):
+        first_line = source.splitlines()[0] if source.splitlines() else source
+        if re.match(r"^\s*cd(?:\s|$)", first_line, re.IGNORECASE):
+            return False
     return source.endswith("\\") and collapse_line_continuations(source + "\n") == collapse_line_continuations(source[:-1])
 
 def _substitution_end(source: str, start: int) -> int:

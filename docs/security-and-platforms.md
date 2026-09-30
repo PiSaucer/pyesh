@@ -6,7 +6,7 @@ pyesh parses supported operators itself and invokes subprocesses with argument l
 
 ## Local command policy
 
-Bare names are resolved only through `PATH`. A current-directory file requires an explicit path such as `./tool.py`, `../tool.sh`, or an absolute path. This prevents an untrusted local file named like a global command from silently shadowing it. Tab completion preserves this policy by prefixing local command files with `./` or `.\\`.
+Bare names are resolved only through `PATH`. A current-directory file requires an explicit path such as `./tool.py`, `../tool.sh`, or an absolute path. This prevents an untrusted local file named like a global command from silently shadowing it. Tab completion preserves this policy by prefixing local command files with `./`.
 
 ## Trust levels
 

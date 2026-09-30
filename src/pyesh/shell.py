@@ -63,6 +63,13 @@ from .profiles import apply_profile_environment
 _PYTHON_ASSIGNMENT = re.compile(r"^\s*(@[A-Za-z_][A-Za-z0-9_]*(?::[a-z]+)?)\s*=\s*(.+)$", re.DOTALL)
 _PYTHON_CAPTURE = re.compile(r"^\s*(@[A-Za-z_][A-Za-z0-9_]*(?::[a-z]+)?)\s*<\s*(.+)$", re.DOTALL)
 
+def _session_path(path, state: "SessionState") -> Path:
+    """Resolve a path against the isolated session directory."""
+    candidate = Path(path).expanduser()
+    if not candidate.is_absolute():
+        candidate = state.cwd / candidate
+    return candidate
+
 @dataclass
 class SessionState:
     """Mutable settings that may change during one interactive session.
@@ -204,7 +211,7 @@ def _source_file(arguments: List[str], state: SessionState) -> int:
     if len(arguments) != 2:
         print_error("pyesh: source: expected exactly one file")
         return 2
-    path = Path(arguments[1]).expanduser()
+    path = _session_path(arguments[1], state)
     if not path.is_file():
         print_error("pyesh: source: no such file: {0}".format(path))
         return 1
@@ -323,7 +330,7 @@ def _run_builtin(command: Command, state: SessionState) -> Optional[int]:
                 if name != "read":
                     print_error("pyesh: input redirection is only supported for read")
                     return 1
-                stream = stack.enter_context(open(command.input_path, encoding="utf-8"))
+                stream = stack.enter_context(_session_path(command.input_path, state).open(encoding="utf-8"))
                 previous_input = sys.stdin
                 stack.callback(setattr, sys, "stdin", previous_input)
                 sys.stdin = stream
@@ -347,7 +354,7 @@ def _run_builtin(command: Command, state: SessionState) -> Optional[int]:
                     else:
                         stack.enter_context(redirect_stderr(stream))
                     continue
-                stream = stack.enter_context(open(path, "a" if operator in (">>", "2>>") else "w", encoding="utf-8"))
+                stream = stack.enter_context(_session_path(path, state).open("a" if operator in (">>", "2>>") else "w", encoding="utf-8"))
                 if operator in (">", ">>", "&>"):
                     stack.enter_context(redirect_stdout(stream))
                 if operator in ("2>", "2>>", "&>"):
@@ -379,7 +386,7 @@ def _run_builtin_inner(command: Command, state: SessionState) -> Optional[int]:
             return state.plugins.run(command.arguments)
         try:
             mode = "a" if command.append_output else "w"
-            with Path(command.output_path).open(mode, encoding="utf-8") as output:
+            with _session_path(command.output_path, state).open(mode, encoding="utf-8") as output:
                 with redirect_stdout(output):
                     return state.plugins.run(command.arguments)
         except OSError as error:
@@ -464,7 +471,7 @@ def _write_raw_output(data: bytes) -> None:
         sys.stdout.write(data.decode("utf-8", errors="replace"))
         sys.stdout.flush()
 
-def _save_python_pipe_file(command: Command, data: bytes) -> None:
+def _save_python_pipe_file(command: Command, data: bytes, state: SessionState) -> None:
     """Write or append exact captured bytes for a virtual endpoint.
 
     Args:
@@ -481,7 +488,7 @@ def _save_python_pipe_file(command: Command, data: bytes) -> None:
         return
     mode = "ab" if command.append_output else "wb"
     try:
-        with Path(command.output_path).open(mode) as output:
+        with _session_path(command.output_path, state).open(mode) as output:
             output.write(data)
     except OSError as error:
         raise ValueError("could not write Python pipeline file {0}: {1}".format(command.output_path, error)) from error
@@ -562,7 +569,7 @@ def _load_python_pipe_file(
         ValueError: If the file cannot be read or decoded.
     """
     try:
-        data = Path(command.input_path or "").read_bytes()
+        data = _session_path(command.input_path or "", state).read_bytes()
     except OSError as error:
         raise ValueError("could not read Python pipeline file {0}: {1}".format(command.input_path, error)) from error
     state.python.namespace[reference.name] = decode_variable(reference, data)
@@ -623,10 +630,10 @@ def _execute_python_pipeline(commands: List[Command], state: SessionState, verbo
     if capture is not None:
         if verbose:
             print_python_pipe_trace(commands[-1].arguments[0], "capture")
-        _save_python_pipe_file(commands[-1], output)
+        _save_python_pipe_file(commands[-1], output, state)
         state.python.namespace[capture.name] = decode_variable(capture, output)
     elif source is not None and not real_commands:
-        _save_python_pipe_file(commands[0], output)
+        _save_python_pipe_file(commands[0], output, state)
         if commands[0].output_path is None:
             _write_raw_output(output)
     return status

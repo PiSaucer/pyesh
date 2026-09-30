@@ -268,8 +268,10 @@ def _path_candidates(prefix: str, cwd: Optional[Path] = None) -> List[str]:
             displayed = (os.path.join(typed_parent, entry.name) if typed_parent else entry.name)
         else:
             displayed = entry.name
+        if os.name == "nt":
+            displayed = displayed.replace("\\", "/")
         if entry.is_dir():
-            displayed += os.sep
+            displayed += "/" if os.name == "nt" else os.sep
         candidates.append(quote + displayed + closing_quote)
     return sorted(candidates)
 
@@ -281,12 +283,13 @@ def _local_command_candidates(prefix: str, cwd: Optional[Path] = None) -> List[s
 
     Returns:
         Filesystem candidates. Bare current-directory matches are prefixed with
-        ``./`` (or ``.\\`` on Windows); already-qualified paths are preserved.
+        ``./``; already-qualified paths are preserved.
     """
     candidates = _path_candidates(prefix, cwd)
     if os.path.dirname(prefix):
         return candidates
-    return [".{0}{1}".format(os.sep, candidate) for candidate in candidates]
+    separator = "/" if os.name == "nt" else os.sep
+    return [".{0}{1}".format(separator, candidate) for candidate in candidates]
 
 class ShellCompleter:
     """Stateful adapter implementing readline's completion protocol."""

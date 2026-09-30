@@ -18,9 +18,9 @@ The interactive editor provides:
 * Tab completion of built-ins and loaded plugin commands;
 * executable discovery from `PATH`;
 * filesystem completion for later arguments;
-* current-directory command completion with an explicit `./` or `.\\` prefix.
+* current-directory command completion with an explicit `./` prefix.
 
-Completion matching is case-insensitive and preserves the spelling of the matching command or filesystem entry. Directories end with the platform path separator. Typed `./` and `~/` prefixes are preserved. Alternate frontends that pass their own input function remain independent of this editor.
+Completion matching is case-insensitive and preserves the spelling of the matching command or filesystem entry. Directories end with `/`, including on Windows, so completed paths cannot be mistaken for line continuations. Typed `./` and `~/` prefixes are preserved. Alternate frontends that pass their own input function remain independent of this editor.
 
 ## Colors
 

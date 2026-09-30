@@ -130,6 +130,29 @@ def discover_bash(environment=None) -> Optional[str]:
         ], values
     )
 
+def _is_wsl_bash(executable: str) -> bool:
+    """Return whether a Windows Bash executable is the WSL launcher."""
+    if os.name != "nt":
+        return False
+    path = Path(executable)
+    return path.name.lower() == "bash.exe" and any(
+        part.lower() == "windowsapps" for part in path.parts
+    )
+
+def _bash_script_path(script: Path, bash: str) -> str:
+    """Format a script path for the discovered Bash implementation."""
+    if os.name != "nt":
+        return str(script)
+    if _is_wsl_bash(bash):
+        absolute = script.absolute()
+        drive = absolute.drive.rstrip(":").lower()
+        if drive:
+            return "/mnt/{0}{1}".format(
+                drive,
+                absolute.as_posix()[len(absolute.drive):],
+            )
+    return script.absolute().as_posix()
+
 def discover_powershell(environment=None) -> Optional[str]:
     """Discover PowerShell Core or Windows PowerShell.
 
@@ -192,7 +215,7 @@ def _known_shebang_command(shebang: List[str], script: Path, environment=None) -
         bash = discover_bash(environment)
         if bash is None:
             raise RuntimeUnavailableError("Bash is required for {0}; install Bash or Git for Windows".format(script))
-        return [bash] + interpreter_arguments + [str(script)]
+        return [bash] + interpreter_arguments + [_bash_script_path(script, bash)]
     if interpreter in ("pwsh", "pwsh.exe", "powershell", "powershell.exe"):
         powershell = discover_powershell(environment)
         if powershell is None:
@@ -238,7 +261,7 @@ def prepare_command(arguments: List[str], environment=None) -> List[str]:
         bash = discover_bash(environment)
         if bash is None:
             raise RuntimeUnavailableError("Bash is required for {0}; install Bash or Git for Windows".format(script))
-        return [bash, str(script)] + arguments[1:]
+        return [bash, _bash_script_path(script, bash)] + arguments[1:]
     if suffix == ".ps1":
         powershell = discover_powershell(environment)
         if powershell is None:

@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Quoted Windows executable paths containing spaces now launch as shell commands instead of being evaluated as Python strings.
 * Path completion now handles quoted Windows paths without crashing on malformed or inaccessible directory names.
 * The default Windows prompt no longer reserves space for an unsupported platform icon.
+* Relative source files, redirections, and Python pipeline files now resolve against the pyesh session directory after `cd`.
+* Windows Bash now translates script paths for the WSL `bash.exe` launcher while retaining compatible paths for Git Bash.
+* A trailing backslash in a Windows `cd` path is treated as a path separator instead of opening the continuation prompt.
+* Windows path completion now emits forward slashes, preventing completed directories from being mistaken for line continuations.
+* Bundled shell scripts now use enforced LF line endings so they run cleanly under Bash and WSL.
 
 ## [1.0.0] - 2026-09-17
 

@@ -45,6 +45,13 @@ def _prepare(arguments, cwd=None, environment=None):
         values[0] = str(Path(cwd) / values[0])
     return prepare_command(values, environment)
 
+def _session_path(path, cwd=None):
+    """Resolve a path against the isolated session directory."""
+    candidate = Path(path)
+    if cwd is not None and not candidate.is_absolute():
+        candidate = Path(cwd) / candidate
+    return candidate
+
 def _normalize_status(code: int) -> int:
     """Convert raw return code into a standard shell exit status.
 
@@ -123,7 +130,7 @@ def _wait_for_processes(processes: List[subprocess.Popen]) -> bool:
                 interrupted = True
     return interrupted
 
-def _redirect_streams(command, standard_output, opened_files):
+def _redirect_streams(command, standard_output, opened_files, cwd=None):
     """Resolve output destinations in lexical order.
 
     Args:
@@ -151,7 +158,7 @@ def _redirect_streams(command, standard_output, opened_files):
         if operator == "2>&-":
             standard_error = subprocess.DEVNULL
             continue
-        stream = open(path, "ab" if operator in (">>", "2>>") else "wb")
+        stream = _session_path(path, cwd).open("ab" if operator in (">>", "2>>") else "wb")
         opened_files.append(stream)
         if operator in (">", ">>", "&>"):
             standard_output = stream
@@ -253,7 +260,7 @@ def run_pipeline(
                 input_file if index == 0 and input_file is not None else previous_output
             )
             if command.input_path is not None:
-                standard_input = open(command.input_path, "rb")
+                standard_input = _session_path(command.input_path, cwd).open("rb")
                 opened_files.append(standard_input)
             if command.heredoc_data is not None:
                 heredoc = tempfile.TemporaryFile()
@@ -266,7 +273,7 @@ def run_pipeline(
 
             standard_output = subprocess.PIPE if index < len(commands) - 1 else None
             standard_output, standard_error = _redirect_streams(
-                command, standard_output, opened_files
+                command, standard_output, opened_files, cwd
             )
             if (background and index == 0 and standard_input is None
                     and (jobs is None or jobs.terminal_fd is None)):
@@ -385,7 +392,7 @@ def run_pipeline_captured(
                 input_file if index == 0 and input_file is not None else previous_output
             )
             if command.input_path is not None:
-                standard_input = open(command.input_path, "rb")
+                standard_input = _session_path(command.input_path, cwd).open("rb")
                 opened_files.append(standard_input)
             if command.heredoc_data is not None:
                 heredoc = tempfile.TemporaryFile()
@@ -397,7 +404,7 @@ def run_pipeline_captured(
                 standard_input = subprocess.DEVNULL
             standard_output = subprocess.PIPE
             standard_output, standard_error = _redirect_streams(
-                command, standard_output, opened_files
+                command, standard_output, opened_files, cwd
             )
             prepared_arguments = _prepare(command.arguments, cwd, environment)
             if verbose:
