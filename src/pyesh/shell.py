@@ -44,7 +44,6 @@ from .python_pipes import (
     encode_variable,
     parse_reference,
 )
-from .terminal import create_prompt_session, formatted_prompt
 from .user_files import (
     UserFiles,
     enabled_plugins,
@@ -58,7 +57,6 @@ from .user_files import (
     user_files,
     write_history,
 )
-from .profiles import apply_profile_environment
 
 _PYTHON_ASSIGNMENT = re.compile(r"^\s*(@[A-Za-z_][A-Za-z0-9_]*(?::[a-z]+)?)\s*=\s*(.+)$", re.DOTALL)
 _PYTHON_CAPTURE = re.compile(r"^\s*(@[A-Za-z_][A-Za-z0-9_]*(?::[a-z]+)?)\s*<\s*(.+)$", re.DOTALL)
@@ -998,6 +996,12 @@ def run_shell(
     prompt_template = settings.prompt
 
     if input_fn is input:
+        # Terminal and profile dependencies are only needed by the built-in
+        # interactive frontend. Alternate frontends and command/script
+        # execution can use this module without initializing prompt-toolkit.
+        from .profiles import apply_profile_environment
+        from .terminal import create_prompt_session, formatted_prompt
+
         files = user_files()
         state.welcome_path = files.welcome
         try:

@@ -7,12 +7,6 @@ from pathlib import Path
 from typing import List, Optional
 
 from . import __version__
-from .config import ShellConfig
-from .plugins import discover_plugins
-from .profiles import apply_profile_environment, available_profiles, load_profile
-from .shell import SessionState, execute_script, run_shell
-from .user_files import enabled_plugins, initialize_user_files, load_environment, load_search_paths, startup_commands, user_files
-
 def build_parser() -> argparse.ArgumentParser:
     """Create the public command-line argument parser.
 
@@ -102,6 +96,8 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(version_report())
         return 0
     if args.init:
+        from .user_files import initialize_user_files, user_files
+
         files = user_files()
         created = initialize_user_files(files)
         if created:
@@ -111,14 +107,20 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("pyesh user files already exist in {0}".format(files.root))
         return 0
     if args.list_plugins:
+        from .plugins import discover_plugins
+
         discovered = discover_plugins()
         if not discovered:
             print("no installed pyesh plugins")
         for plugin in discovered:
             print("{0} {1} ({2}) -> {3}".format(plugin.name, plugin.version, plugin.distribution, plugin.value))
         return 0
+    from .user_files import user_files
+
     files = user_files()
     if args.list_profiles:
+        from .profiles import available_profiles
+
         try:
             default, names = available_profiles(files.profiles)
         except (OSError, UnicodeError, ValueError) as error:
@@ -129,6 +131,16 @@ def main(argv: Optional[List[str]] = None) -> int:
             print("{0}{1}".format(name, " (default)" if name == default else ""))
         return 0
     try:
+        from .config import ShellConfig
+        from .profiles import apply_profile_environment, load_profile
+        from .shell import SessionState, execute_script, run_shell
+        from .user_files import (
+            enabled_plugins,
+            load_environment,
+            load_search_paths,
+            startup_commands,
+            user_files,
+        )
         _, profile_config = load_profile(files.profiles, args.profile)
     except (OSError, UnicodeError, ValueError) as error:
         parser.error(str(error))

@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 * SSH host completion from `~/.ssh/known_hosts`, including `user@host` forms and distinct SSH username/host highlighting.
 
+### Changed
+
+* Lazy-load the automation API and interactive terminal stack so package imports, `--version`, and non-interactive commands avoid initializing `prompt_toolkit`.
+
 ### Fixed
 
 * Current-directory command completion now preserves explicit `./` and `.\\` prefixes across supported platforms.

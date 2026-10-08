@@ -5,8 +5,6 @@ import os
 import re
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple
-from prompt_toolkit.styles import Style
-
 from .config import DEFAULT_TERMINAL_STYLES, ShellConfig, TerminalConfig
 
 _ENVIRONMENT_NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
@@ -192,6 +190,10 @@ def _parse_profile(profile: Mapping[str, Any], name: str) -> ShellConfig:
             raise ValueError("{0}.terminal.styles.{1} must be a string".format(label, key))
         styles[key] = value
     try:
+        # Profile loading is also used by non-interactive commands. Keep the
+        # terminal dependency out of the module import path, while retaining
+        # the existing validation when a profile is actually parsed.
+        from prompt_toolkit.styles import Style
         Style.from_dict({"pyesh.{0}".format(key): value for key, value in styles.items()})
     except ValueError as error:
         raise ValueError("{0}.terminal.styles has an invalid style: {1}".format(label, error)) from error
