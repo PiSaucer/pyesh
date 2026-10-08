@@ -13,6 +13,8 @@ DEFAULT_TERMINAL_STYLES = {
     "variable": "#d787ff",
     "option": "#ffd75f",
     "number": "#5fd7ff",
+    "ssh-user": "bold #d787ff",
+    "ssh-host": "bold #ffaf5f",
 }
 
 @dataclass(frozen=True)

@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+* SSH host completion from `~/.ssh/known_hosts`, including `user@host` forms and distinct SSH username/host highlighting.
+
 ### Fixed
 
+* Current-directory command completion now preserves explicit `./` and `.\\` prefixes across supported platforms.
 * Execute newline-delimited commands pasted at the interactive prompt separately instead of combining them into one process invocation.
 * Accept backslash-newline shell continuations entered interactively or pasted as a multiline command.
 * Windows command parsing now preserves backslashes in explicit executable paths and accepts a trailing path separator.

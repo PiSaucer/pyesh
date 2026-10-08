@@ -2,7 +2,7 @@
 
 ## Interactive editing
 
-The interactive shell colors input as it is typed. Commands and built-ins, operators, quoted strings, environment and Python-pipeline variables, options, and numbers each use a distinct color. Syntax coloring is presentation-only; the normal pyesh parser remains the source of truth for execution.
+The interactive shell colors input as it is typed. Commands and built-ins, operators, quoted strings, environment and Python-pipeline variables, options, numbers, SSH usernames, and SSH hosts each use a distinct color. For example, `ssh user@host` highlights `user` and `host` separately, while `ssh host` highlights the host directly. Syntax coloring is presentation-only; the normal pyesh parser remains the source of truth for execution.
 
 Set the conventional `NO_COLOR` environment variable to disable input and output colors. Arrow-key history and Tab completion are provided by the same cross-platform editor on Windows, macOS, and Linux.
 
@@ -18,7 +18,8 @@ The interactive editor provides:
 * Tab completion of built-ins and loaded plugin commands;
 * executable discovery from `PATH`;
 * filesystem completion for later arguments;
-* current-directory command completion with an explicit `./` prefix.
+* SSH host completion from `~/.ssh/known_hosts`, including `user@host` forms;
+* current-directory command completion with an explicit `./` or `.\\` prefix.
 
 Completion matching is case-insensitive and preserves the spelling of the matching command or filesystem entry. Directories end with `/`, including on Windows, so completed paths cannot be mistaken for line continuations. Typed `./` and `~/` prefixes are preserved. Alternate frontends that pass their own input function remain independent of this editor.
 

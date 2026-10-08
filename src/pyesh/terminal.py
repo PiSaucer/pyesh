@@ -44,6 +44,7 @@ def syntax_fragments(command_line: str) -> List[Tuple[str, str]]:
     """
     fragments: List[Tuple[str, str]] = []
     command_position = True
+    ssh_target_pending = False
     for match in _SYNTAX_TOKEN.finditer(command_line):
         kind = match.lastgroup or "other"
         text = match.group(0)
@@ -52,6 +53,7 @@ def syntax_fragments(command_line: str) -> List[Tuple[str, str]]:
             style = "class:pyesh.operator"
             if text in ("|", "||", "&&", ";", "&"):
                 command_position = True
+                ssh_target_pending = False
         elif kind == "string":
             style = "class:pyesh.string"
             command_position = False
@@ -71,6 +73,22 @@ def syntax_fragments(command_line: str) -> List[Tuple[str, str]]:
                     if text in BUILTIN_COMMANDS
                     else "class:pyesh.command"
                 )
+                ssh_target_pending = text == "ssh"
+            elif ssh_target_pending and not text.startswith("-"):
+                if "@" in text:
+                    username, separator, host = text.partition("@")
+                    fragments.extend(
+                        (
+                            ("class:pyesh.ssh-user", username),
+                            ("", separator),
+                            ("class:pyesh.ssh-host", host),
+                        )
+                    )
+                else:
+                    fragments.append(("class:pyesh.ssh-host", text))
+                ssh_target_pending = False
+                command_position = False
+                continue
             command_position = False
         fragments.append((style, text))
     return fragments
@@ -134,6 +152,9 @@ class PromptCompleter(Completer):
             candidates = sorted(set( _command_candidates(word, self._extra_commands, self._environment) + _local_command_candidates(word, self._cwd)))
         else:
             candidates = _path_candidates(word, self._cwd)
+            if _is_ssh_destination(document.text_before_cursor, word):
+                ssh_candidates = _ssh_host_candidates(word, self._environment)
+                candidates = ssh_candidates or candidates
         for candidate in candidates:
             yield Completion(candidate, start_position=-len(word))
 
@@ -223,6 +244,50 @@ def _command_candidates(prefix: str, extra_commands: Iterable[str] = (), environ
             ):
                 candidates.add(entry.name)
     return sorted(candidates)
+
+def _is_ssh_destination(text_before_cursor: str, word: str) -> bool:
+    """Return whether the current word is an SSH destination argument."""
+    tokens = re.findall(r"[^\s|&;<>]+", text_before_cursor)
+    if not tokens:
+        return False
+    # The current command is the first token after the latest shell operator.
+    command = tokens[0]
+    for operator in re.finditer(r"[|&;]+", text_before_cursor):
+        tail = text_before_cursor[operator.end():]
+        match = re.search(r"[^\s|&;<>]+", tail)
+        if match:
+            command = match.group(0)
+    return command == "ssh"
+
+def _ssh_host_candidates(prefix: str, environment=None) -> List[str]:
+    """Read literal SSH host names from the user's known-hosts file.
+
+    Hashed and wildcard entries are intentionally omitted because they cannot
+    be meaningfully completed.  The user's ``name@`` prefix is preserved.
+    """
+    user_prefix, separator, host_prefix = prefix.partition("@")
+    lookup_prefix = host_prefix if separator else prefix
+    home = Path((os.environ if environment is None else environment).get("HOME", "")).expanduser()
+    if not home or str(home) == ".":
+        home = Path((os.environ if environment is None else environment).get("USERPROFILE", Path.home()))
+    known_hosts = home / ".ssh" / "known_hosts"
+    try:
+        lines = known_hosts.read_text(encoding="utf-8", errors="ignore").splitlines()
+    except OSError:
+        return []
+
+    hosts: Set[str] = set()
+    folded_prefix = lookup_prefix.casefold()
+    for line in lines:
+        fields = line.split()
+        if not fields or fields[0].startswith("#"):
+            continue
+        for host in fields[0].split(","):
+            if not host or host.startswith(("!", "|", "*", "?")):
+                continue
+            if host.casefold().startswith(folded_prefix):
+                hosts.add((user_prefix + "@" if separator else "") + host)
+    return sorted(hosts, key=str.casefold)
 
 def _path_candidates(prefix: str, cwd: Optional[Path] = None) -> List[str]:
     """Find filesystem entries matching a partial path.
