@@ -305,10 +305,19 @@ def _path_candidates(prefix: str, cwd: Optional[Path] = None) -> List[str]:
         path_prefix = path_prefix[:-1]
 
     expanded = Path(path_prefix).expanduser()
-    parent = expanded.parent if path_prefix else Path(".")
+    # ``Path`` removes a trailing separator, but it carries important editor
+    # meaning: ``foo/bar/`` asks for entries inside ``bar`` rather than for
+    # siblings of ``bar``.  Keep that information before choosing the lookup
+    # directory.  Accept both separators so completion remains useful when a
+    # Windows path is being edited on another platform (and vice versa).
+    has_trailing_separator = path_prefix.endswith(("/", "\\"))
+    if has_trailing_separator:
+        parent = expanded
+    else:
+        parent = expanded.parent if path_prefix else Path(".")
     if not parent.is_absolute():
         parent = (cwd or Path.cwd()) / parent
-    name_prefix = expanded.name if path_prefix else ""
+    name_prefix = "" if has_trailing_separator else (expanded.name if path_prefix else "")
     try:
         entries = list(parent.iterdir())
     except OSError:

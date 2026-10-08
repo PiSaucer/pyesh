@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+* Tab path completion now treats a trailing directory separator as a request to complete entries inside that directory.
 * Current-directory command completion now preserves explicit `./` and `.\\` prefixes across supported platforms.
 * Execute newline-delimited commands pasted at the interactive prompt separately instead of combining them into one process invocation.
 * Accept backslash-newline shell continuations entered interactively or pasted as a multiline command.
